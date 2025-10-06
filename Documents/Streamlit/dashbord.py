@@ -16,8 +16,10 @@ if fl is not None:
     st. write(filename)
     df=pd.read_csv(filename, encoding = "ISO-8859-1")
 else:
-    os.chdir(r"/mount/src/dashbord_app/Documents/Streamlit")
-    df= pd.read_csv("Superstore.csv", encoding = "ISO-8859-1")
+    # Use absolute path relative to this script to avoid FileNotFoundError
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(script_dir, "Superstore.csv")
+    df = pd.read_csv(csv_path, encoding="ISO-8859-1")
 
 col1,col2 = st.columns ((2))
 df["Order Date"]= pd.to_datetime (df["Order Date"])
