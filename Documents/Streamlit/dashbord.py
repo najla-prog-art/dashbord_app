@@ -10,21 +10,93 @@ st.set_page_config(page_title="superstore!!!", page_icon=":bar_chart:", layout="
 st.title(":bar_chart: Sample SuperStore EDA")
 st.markdown('<style>div.block-container{padding-top:1rem;}</style>', unsafe_allow_html=True)
 
-fl= st.file_uploader(":file_folder: upload a file", type=(["csv","txt","xlsx","xls"]))
-if fl is not None: 
-    filename = fl.name
-    st.write(filename)
-    df = pd.read_csv(fl, encoding="ISO-8859-1")
-else:
-    # Use absolute path relative to this script to avoid FileNotFoundError
-    try:
+fl = st.file_uploader(":file_folder: upload a file", type=(["csv","txt","xlsx","xls"]))
+
+# Robust loader: handle uploaded file, local placeholder file, or fetch from GitHub raw URL.
+def _load_superstore(uploaded_file):
+    raw_url = (
+        "https://raw.githubusercontent.com/najla-prog-art/dashbord_app/main/Documents/Streamlit/Superstore.csv"
+    )
+
+    # 1) If user uploaded a file, try to read it
+    if uploaded_file is not None:
+        try:
+            df_local = pd.read_csv(uploaded_file, encoding="ISO-8859-1")
+            source = f"uploaded file: {getattr(uploaded_file, 'name', 'uploaded') }"
+        except Exception:
+            try:
+                uploaded_file.seek(0)
+            except Exception:
+                pass
+            try:
+                df_local = pd.read_csv(uploaded_file)
+                source = f"uploaded file (no encoding): {getattr(uploaded_file, 'name', 'uploaded') }"
+            except Exception as e:
+                st.error(f"Unable to read the uploaded file: {e}")
+                return None
+
+    else:
+        # 2) Try to read repository file (when running locally or on Cloud this may exist)
         script_dir = os.path.dirname(os.path.abspath(__file__))
         csv_path = os.path.join(script_dir, "Superstore.csv")
-        df = pd.read_csv(csv_path, encoding="ISO-8859-1")
-    except FileNotFoundError:
-        # Fallback for Streamlit Cloud deployment
-        url = "https://raw.githubusercontent.com/najla-prog-art/dashbord_app/main/Documents/Streamlit/Superstore.csv"
-        df = pd.read_csv(url, encoding="ISO-8859-1")
+        try:
+            df_local = pd.read_csv(csv_path, encoding="ISO-8859-1")
+            source = f"local file: {csv_path}"
+        except Exception:
+            # Fallback to the raw GitHub URL
+            try:
+                df_local = pd.read_csv(raw_url, encoding="ISO-8859-1")
+                source = f"raw url: {raw_url}"
+            except Exception as e:
+                st.error(f"Unable to load Superstore data from local file or GitHub: {e}")
+                return None
+
+    # Detect placeholder file (common mistake: file contains a single 'wget ...' line)
+    try:
+        if df_local.shape[1] == 1:
+            # inspect first cell for 'wget' or a URL
+            first_cell = str(df_local.iloc[0, 0]) if not df_local.empty else ""
+            if first_cell.strip().startswith("wget") or first_cell.strip().startswith("https://"):
+                # try downloading the real file from raw GitHub URL
+                try:
+                    df_local = pd.read_csv(raw_url, encoding="ISO-8859-1")
+                    source = f"re-downloaded from raw url: {raw_url}"
+                except Exception:
+                    pass
+    except Exception:
+        # if anything goes wrong during placeholder detection, continue with df_local
+        pass
+
+    # Normalize column names (strip whitespace)
+    df_local.columns = [str(c).strip() for c in df_local.columns]
+
+    # If expected 'Order Date' column isn't present, try to find a close match
+    if "Order Date" not in df_local.columns:
+        candidates = [c for c in df_local.columns if "order" in c.lower() and "date" in c.lower()]
+        if candidates:
+            df_local = df_local.rename(columns={candidates[0]: "Order Date"})
+        else:
+            # helpful error in the app and stop further execution
+            st.error(
+                "The dataset does not contain an 'Order Date' column. "
+                f"Columns found: {', '.join(df_local.columns[:50])}"
+            )
+            return None
+
+    # Convert 'Order Date' to datetime where possible
+    try:
+        df_local["Order Date"] = pd.to_datetime(df_local["Order Date"], errors="coerce")
+    except Exception:
+        pass
+
+    # small note for debugging in the app (optional)
+    st.session_state.setdefault("_data_source", source)
+    return df_local
+
+
+df = _load_superstore(fl)
+if df is None:
+    st.stop()
 
 col1,col2 = st.columns ((2))
 df["Order Date"]= pd.to_datetime (df["Order Date"])
