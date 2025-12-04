@@ -230,10 +230,25 @@ with st.expander("Summary Table"):
 
 # Create a scatter plot
 data1 = px.scatter(filtered_df, x="Sales", y="Profit", size="Quantity")
-data1['layout'].update(title="Relationship between Sales and Profits using Scatter Plot.",
-                        titlefont=dict(size=20), xaxis=dict(title="Sales", titlefont=dict(size=19)),
-                        yaxis=dict(title="Profit", titlefont=dict(size=19)))
-st.plotly_chart(data1, use_container_width=True)
+# Use update_layout with explicit dicts to avoid invalid/removed shorthand properties
+try:
+    data1.update_layout(
+        title=dict(text="Relationship between Sales and Profits using Scatter Plot.", font=dict(size=20)),
+        xaxis=dict(title=dict(text="Sales", font=dict(size=19))),
+        yaxis=dict(title=dict(text="Profit", font=dict(size=19)))
+    )
+except Exception as _e:
+    # Don't let a layout error crash the app; record for debugging and continue with default layout
+    st.session_state.setdefault("_last_plot_error", str(_e))
+    st.warning("Notice: could not apply custom layout to scatter plot — using default layout.")
+
+# Use `width='stretch'` (replacement for deprecated `use_container_width=True`)
+try:
+    st.plotly_chart(data1, width='stretch')
+except Exception as _e:
+    # If plotting itself fails, record and show a friendly message (don't raise)
+    st.session_state.setdefault("_last_plot_error", str(_e))
+    st.error("Unable to render scatter plot.")
 
 with st.expander("View Data"):
     st.write(filtered_df.iloc[1:500, 1:20:2].style.background_gradient(cmap="Oranges"))
