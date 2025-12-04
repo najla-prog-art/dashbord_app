@@ -98,6 +98,10 @@ df = _load_superstore(fl)
 if df is None:
     st.stop()
 
+# Show which data source was used (helpful when debugging deployments)
+data_source = st.session_state.get("_data_source", "unknown")
+st.info(f"Data source: {data_source}")
+
 col1,col2 = st.columns ((2))
 df["Order Date"]= pd.to_datetime (df["Order Date"])
 
