@@ -12,14 +12,19 @@ st.markdown('<style>div.block-container{padding-top:1rem;}</style>', unsafe_allo
 
 fl= st.file_uploader(":file_folder: upload a file", type=(["csv","txt","xlsx","xls"]))
 if fl is not None: 
-    filename =fl.name
-    st. write(filename)
-    df=pd.read_csv(filename, encoding = "ISO-8859-1")
+    filename = fl.name
+    st.write(filename)
+    df = pd.read_csv(fl, encoding="ISO-8859-1")
 else:
     # Use absolute path relative to this script to avoid FileNotFoundError
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(script_dir, "Superstore.csv")
-    df = pd.read_csv(csv_path, encoding="ISO-8859-1")
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        csv_path = os.path.join(script_dir, "Superstore.csv")
+        df = pd.read_csv(csv_path, encoding="ISO-8859-1")
+    except FileNotFoundError:
+        # Fallback for Streamlit Cloud deployment
+        url = "https://raw.githubusercontent.com/najla-prog-art/dashbord_app/main/Documents/Streamlit/Superstore.csv"
+        df = pd.read_csv(url, encoding="ISO-8859-1")
 
 col1,col2 = st.columns ((2))
 df["Order Date"]= pd.to_datetime (df["Order Date"])
@@ -97,11 +102,11 @@ with cl1:
 
 with cl2:
     with st.expander("Region_ViewData"):
-        region= filtered_df.groupby(by="Region", as_index= False)["Sales"].sum()
-        st.write( region. style.background_gradient(cmap="Oranges"))
-        csv= region.to_csv(index= False).encode('utf-8')
-        st.download_button("Download Data", data= csv, file_name = "Region.csv", mime= "text/csv", 
-                        help= 'Click here to download the data as a csv file')
+        region_sales = filtered_df.groupby(by="Region", as_index=False)["Sales"].sum()
+        st.write(region_sales.style.background_gradient(cmap="Oranges"))
+        csv = region_sales.to_csv(index=False).encode('utf-8')
+        st.download_button("Download Data", data=csv, file_name="Region.csv", mime="text/csv",
+                        help='Click here to download the data as a csv file')
         
 filtered_df["month_year"] = filtered_df ["Order Date"].dt.to_period("M")
 st.subheader('Time Series Analysis')
@@ -110,10 +115,10 @@ linechart = pd.DataFrame (filtered_df.groupby (filtered_df["month_year"].dt.strf
 fig2 = px.line(linechart, x = "month_year", y="Sales", labels= {"Sales": "Amount"}, height= 500, width= 1000, template= "gridon")
 st.plotly_chart(fig2,use_container_width=True)
 
-with st.expander("Viwe Data of TimeSeries:"):
+with st.expander("View Data of TimeSeries:"):
     st.write(linechart.T.style.background_gradient(cmap="Blues"))
     csv = linechart.to_csv(index=False).encode("utf-8")
-    st.download_button('Dawnload Data', data = csv, file_name= "TimeSeries.csv", mime= 'text/csv')
+    st.download_button('Download Data', data=csv, file_name="TimeSeries.csv", mime='text/csv')
 
     # Create a tree based on Region, Category, Sub-Category
 st.subheader("Hierarchical view of Sales using TreeMap")
